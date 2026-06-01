@@ -285,9 +285,16 @@ if "tg_chat_id"     not in st.session_state: st.session_state.tg_chat_id     = "
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def parse_field(text: str, key: str) -> str:
-    pattern = rf"{key}:\s*(.+?)(?=\n[A-ZČŠŽ_]+:|$)"
+    # Try strict format first
+    pattern = rf"{key}:\s*(.+?)(?=\n[A-ZČŠŽ_]{{2,}}:|\Z)"
+    m = re.search(pattern, text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    # Fallback: case insensitive
     m = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-    return m.group(1).strip() if m else "—"
+    if m:
+        return m.group(1).strip()
+    return "—"
 
 def max_stake() -> float:
     return min(5.0, st.session_state.bankroll * 0.25)
@@ -538,6 +545,10 @@ with tab_analiza:
             st.markdown(f"<div class='section-label'>Trener</div><div style='color:#c9d5e8; font-size:14px; margin-bottom:10px;'>{a['trener_gostje']}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='section-label'>Postava / poškodbe</div><div style='color:#c9d5e8; font-size:14px; margin-bottom:10px;'>{a['postava_gostje']}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='section-label'>Forma (zadnjih 5)</div><div style='color:#c9d5e8; font-size:14px;'>{a['forma_gostje']}</div>", unsafe_allow_html=True)
+
+        # Debug expander - shows raw AI response
+        with st.expander("🔧 Surovi AI odgovor (za debug)"):
+            st.code(a.get("raw", "ni podatkov"), language=None)
 
         st.divider()
 
