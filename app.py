@@ -398,10 +398,17 @@ with st.sidebar:
     st.divider()
 
     st.markdown("**📬 Telegram**")
-    tg_tok = st.text_input("Bot token", value=st.session_state.tg_token, placeholder="1234:ABC...", type="password")
-    tg_cid = st.text_input("Chat ID", value=st.session_state.tg_chat_id, placeholder="-100...")
-    if tg_tok: st.session_state.tg_token = tg_tok
-    if tg_cid: st.session_state.tg_chat_id = tg_cid
+    tg_tok = st.secrets.get("TELEGRAM_TOKEN", "") if hasattr(st, "secrets") else ""
+    tg_cid = st.secrets.get("TELEGRAM_CHAT_ID", "") if hasattr(st, "secrets") else ""
+    if tg_tok and tg_cid:
+        st.success("📬 Telegram naložen iz Secrets", icon="✅")
+        st.session_state.tg_token = tg_tok
+        st.session_state.tg_chat_id = tg_cid
+    else:
+        tg_tok_in = st.text_input("Bot token", value=st.session_state.tg_token, placeholder="1234:ABC...", type="password")
+        tg_cid_in = st.text_input("Chat ID", value=st.session_state.tg_chat_id, placeholder="8869048456")
+        if tg_tok_in: st.session_state.tg_token = tg_tok_in
+        if tg_cid_in: st.session_state.tg_chat_id = tg_cid_in
 
     st.divider()
     st.markdown("<p style='color:#3b3f4e; font-size:11px;'>⚠️ Stave so tvegane. Nikoli ne stavij več kot si pripravljen izgubiti.</p>", unsafe_allow_html=True)
