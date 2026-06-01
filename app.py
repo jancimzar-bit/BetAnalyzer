@@ -258,18 +258,18 @@ class Match:
     flag_away: str
 
 MATCHES = [
-    Match(1,  "Argentina",    "Kanada",        "12. jun 2026", "A", "21:00", "🇦🇷", "🇨🇦"),
-    Match(2,  "Španija",      "Maroko",         "13. jun 2026", "B", "18:00", "🇪🇸", "🇲🇦"),
-    Match(3,  "Francija",     "Mehika",         "13. jun 2026", "C", "21:00", "🇫🇷", "🇲🇽"),
-    Match(4,  "Nemčija",      "Japonska",       "14. jun 2026", "D", "18:00", "🇩🇪", "🇯🇵"),
-    Match(5,  "Brazilija",    "Nigerija",       "14. jun 2026", "E", "21:00", "🇧🇷", "🇳🇬"),
-    Match(6,  "Anglija",      "Senegal",        "15. jun 2026", "F", "21:00", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇸🇳"),
-    Match(7,  "Portugalska",  "Češka",          "15. jun 2026", "G", "18:00", "🇵🇹", "🇨🇿"),
-    Match(8,  "Nizozemska",   "Peru",           "16. jun 2026", "H", "21:00", "🇳🇱", "🇵🇪"),
-    Match(9,  "Hrvaška",      "Maroko",         "17. jun 2026", "B", "15:00", "🇭🇷", "🇲🇦"),
-    Match(10, "ZDA",          "Panama",         "17. jun 2026", "C", "21:00", "🇺🇸", "🇵🇦"),
-    Match(11, "Belgija",      "Egipt",          "18. jun 2026", "D", "18:00", "🇧🇪", "🇪🇬"),
-    Match(12, "Urugvaj",      "Slovenija",      "19. jun 2026", "F", "15:00", "🇺🇾", "🇸🇮"),
+    Match(1,  "Argentina",    "Kanada",        "12. jun 2026", "A", "21:00", "", ""),
+    Match(2,  "Španija",      "Maroko",         "13. jun 2026", "B", "18:00", "", ""),
+    Match(3,  "Francija",     "Mehika",         "13. jun 2026", "C", "21:00", "", ""),
+    Match(4,  "Nemčija",      "Japonska",       "14. jun 2026", "D", "18:00", "", ""),
+    Match(5,  "Brazilija",    "Nigerija",       "14. jun 2026", "E", "21:00", "", ""),
+    Match(6,  "Anglija",      "Senegal",        "15. jun 2026", "F", "21:00", "", ""),
+    Match(7,  "Portugalska",  "Češka",          "15. jun 2026", "G", "18:00", "", ""),
+    Match(8,  "Nizozemska",   "Peru",           "16. jun 2026", "H", "21:00", "", ""),
+    Match(9,  "Hrvaška",      "Maroko",         "17. jun 2026", "B", "15:00", "", ""),
+    Match(10, "ZDA",          "Panama",         "17. jun 2026", "C", "21:00", "", ""),
+    Match(11, "Belgija",      "Egipt",          "18. jun 2026", "D", "18:00", "", ""),
+    Match(12, "Urugvaj",      "Slovenija",      "19. jun 2026", "F", "15:00", "", ""),
 ]
 
 GROUPS = sorted(set(m.group for m in MATCHES))
@@ -325,7 +325,7 @@ OPOZORILO: [morebitna tveganja ali zakaj biti previden]"""
 
     messages = [{
         "role": "user",
-        "content": f"Analiziraj tekmo SP 2026: {match.home} vs {match.away} ({match.date}, Skupina {match.group}). Uporabi web search za najnovejše informacije o poškodbah, formi ekip, morebitnih suspenzijah in kvotah stavnic."
+        "content": f"POMEMBNO: Analiziraj TOČNO TO tekmo SP 2026: {match.home} (domači) proti {match.away} (gostje), datum {match.date}, Skupina {match.group}. NE analiziraj nobene druge tekme. Poišči informacije SAMO o {match.home} in {match.away}. Preveri poškodbe, formo, suspenzije in kvote stavnic za to specifično tekmo."
     }]
 
     response = client.messages.create(
@@ -440,6 +440,7 @@ with tab_tekme:
         is_value = analyzed and st.session_state.analyses[match.id].get("value_bet", "").upper().startswith("DA")
 
         with st.container():
+            value_html = "&nbsp; <span style='background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);padding:2px 8px;border-radius:20px;font-size:11px;'>✦ VALUE BET</span>" if is_value else ("&nbsp; <span style='color:#10b981;font-size:11px;'>✓ Analizirano</span>" if analyzed else "")
             c1, c2, c3, c4 = st.columns([3, 1, 1, 1.5])
             with c1:
                 st.markdown(f"""
@@ -449,8 +450,7 @@ with tab_tekme:
                   </div>
                   <div style='font-size: 12px; color: #6b7280; margin-top: 4px;'>
                     📅 {match.date} · {match.time} &nbsp;·&nbsp; Skupina {match.group}
-                    {"&nbsp; <span class='value-badge'>✦ VALUE BET</span>" if is_value else ""}
-                    {"&nbsp; <span style='color:#10b981; font-size:11px;'>✓ Analizirano</span>" if analyzed and not is_value else ""}
+                    {value_html}
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
