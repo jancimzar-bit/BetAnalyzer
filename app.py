@@ -368,10 +368,15 @@ with st.sidebar:
     st.markdown("<p style='color:#6b7280; font-size:12px; margin-top:-10px;'>Stavni analizator</p>", unsafe_allow_html=True)
     st.divider()
 
-    st.markdown("**🔑 Anthropic API ključ**")
-    api_key = st.text_input("", placeholder="sk-ant-...", type="password", label_visibility="collapsed")
-    if not api_key:
-        st.warning("Vnesi API ključ za analizo.")
+    # Najprej poskusi iz Streamlit Secrets, sicer iz ročnega vnosa
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "") if hasattr(st, "secrets") else ""
+    if api_key:
+        st.success("🔑 API ključ naložen iz Secrets", icon="✅")
+    else:
+        st.markdown("**🔑 Anthropic API ključ**")
+        api_key = st.text_input("", placeholder="sk-ant-...", type="password", label_visibility="collapsed")
+        if not api_key:
+            st.warning("Vnesi API ključ ali ga dodaj v Streamlit Secrets.")
 
     st.divider()
 
