@@ -356,18 +356,6 @@ if "tg_chat_id"     not in st.session_state: st.session_state.tg_chat_id     = "
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def parse_field(text: str, key: str) -> str:
-    # Try strict format first
-    pattern = rf"{key}:\s*(.+?)(?=\n[A-ZČŠŽ_]{{2,}}:|\Z)"
-    m = re.search(pattern, text, re.DOTALL)
-    if m:
-        return m.group(1).strip()
-    # Fallback: case insensitive
-    m = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-    if m:
-        return m.group(1).strip()
-    return "—"
-
 def max_stake() -> float:
     return min(5.0, st.session_state.bankroll * 0.25)
 
@@ -377,67 +365,76 @@ def kelly_stake() -> float:
 def analyze_match(match: Match, api_key: str) -> dict:
     client = anthropic.Anthropic(api_key=api_key)
 
-    system = f"""Si vrhunski stavni analitik za SP 2026. Odgovarjaš IZKLJUČNO v slovenščini.
-Bankroll: {st.session_state.bankroll:.2f} €, maksimalni priporočeni stavek: {max_stake():.2f} €.
-
-Tvoja analiza mora biti strukturirana TOČNO v tej obliki (vsak razdelek na svoji vrstici):
-
-ANALIZA: [2-3 stavki splošne ocene tekme]
-POSTAVA_DOMA: [polna postava ali poškodbe/odsotnosti]  
-POSTAVA_GOSTJE: [polna postava ali poškodbe/odsotnosti]
-FORMA_DOMA: [zadnjih 5 tekem z rezultati, npr. Z Z R P Z]
-FORMA_GOSTJE: [zadnjih 5 tekem z rezultati]
-TRENER_DOMA: [ime trenerja in kratka ocena]
-TRENER_GOSTJE: [ime trenerja in kratka ocena]
-VERJETNOST_DOMA: [% npr. 55]
-VERJETNOST_REMI: [% npr. 25]
-VERJETNOST_GOSTJE: [% npr. 20]
-KVOTA_DOMA: [pričakovana poštena kvota]
-KVOTA_REMI: [pričakovana poštena kvota]
-KVOTA_GOSTJE: [pričakovana poštena kvota]
-VALUE_BET: [DA ali NE]
-VALUE_TRG: [npr. "Zmaga Španije", "Obe ekipi dasta gol", "Nad 2.5 gola", itd.]
-RAZLOG_VALUE: [zakaj je tu vrednost - konkretna razlaga]
-PRIPOROČILO: [točno kaj staviti in koliko €]
-ZAUPANJE: [nizko / srednje / visoko]
-OPOZORILO: [morebitna tveganja ali zakaj biti previden]"""
-
-    messages = [{
-        "role": "user",
-        "content": f"POMEMBNO: Analiziraj TOČNO TO tekmo SP 2026: {match.home} (domači) proti {match.away} (gostje), datum {match.date}, Skupina {match.group}. NE analiziraj nobene druge tekme. Poišči informacije SAMO o {match.home} in {match.away}. Preveri poškodbe, formo, suspenzije in kvote stavnic za to specifično tekmo."
-    }]
-
-    response = client.messages.create(
+    # Korak 1: web search za podatke o tekmi
+    search_response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1200,
+        max_tokens=2000,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
-        system=system,
-        messages=messages,
+        system="Si nogometni analitik. Poišči najnovejše informacije o navedeni tekmi SP 2026: poškodbe, suspenzije, forma ekip, trenerji, predvidene postave, kvote stavnic. Zberi VSE relevantne podatke in jih napiši v slovenščini.",
+        messages=[{"role": "user", "content": f"Poišči informacije za tekmo SP 2026: {match.home} vs {match.away}, {match.date}, Skupina {match.group}. Potrebujem: poškodbe, forma zadnjih 5 tekem, trenerja obeh ekip, predvideno postavo, trenutne kvote stavnic."}],
+    )
+    search_text = " ".join(b.text for b in search_response.content if hasattr(b, "text"))
+
+    # Korak 2: strukturirana JSON analiza na podlagi zbranih podatkov
+    json_response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=f"""Si vrhunski stavni analitik. Na podlagi podanih podatkov vrni IZKLJUČNO veljaven JSON objekt brez kakršnega koli besedila pred ali za njim, brez markdown, brez ```json.
+Bankroll: {st.session_state.bankroll:.2f} EUR, max stavek: {max_stake():.2f} EUR.
+Vsa besedila v slovenščini.""",
+        messages=[{"role": "user", "content": f"""Na podlagi teh podatkov o tekmi {match.home} vs {match.away} ({match.date}, Skupina {match.group}):
+
+{search_text}
+
+Vrni JSON z natanko temi polji:
+{{
+  "analiza": "2-3 stavki splošne ocene tekme",
+  "postava_doma": "ključni igralci in poškodovani",
+  "postava_gostje": "ključni igralci in poškodovani",
+  "forma_doma": "zadnjih 5 tekem npr: Z R Z Z P",
+  "forma_gostje": "zadnjih 5 tekem npr: R R Z P R",
+  "trener_doma": "ime trenerja in kratka ocena",
+  "trener_gostje": "ime trenerja in kratka ocena",
+  "ver_doma": "55",
+  "ver_remi": "25",
+  "ver_gostje": "20",
+  "kvota_doma": "1.80",
+  "kvota_remi": "3.40",
+  "kvota_gostje": "4.50",
+  "value_bet": "DA",
+  "value_trg": "npr Zmaga {match.home} ali Obe ekipi dasta gol",
+  "razlog_value": "zakaj je tu vrednost",
+  "priporocilo": "točno kaj staviti in koliko EUR",
+  "zaupanje": "nizko ali srednje ali visoko",
+  "opozorilo": "morebitna tveganja"
+}}"""}],
     )
 
-    raw = " ".join(b.text for b in response.content if hasattr(b, "text"))
+    raw_json = " ".join(b.text for b in json_response.content if hasattr(b, "text"))
 
+    # Poskusi parsati JSON
+    try:
+        clean = re.sub(r"```json|```", "", raw_json).strip()
+        # Najdi JSON objekt
+        json_match = re.search(r"\{.*\}", clean, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group())
+            data["raw"] = raw_json
+            return data
+    except Exception:
+        pass
+
+    # Fallback: vrni surovi tekst
     return {
-        "raw":              raw,
-        "analiza":          parse_field(raw, "ANALIZA"),
-        "postava_doma":     parse_field(raw, "POSTAVA_DOMA"),
-        "postava_gostje":   parse_field(raw, "POSTAVA_GOSTJE"),
-        "forma_doma":       parse_field(raw, "FORMA_DOMA"),
-        "forma_gostje":     parse_field(raw, "FORMA_GOSTJE"),
-        "trener_doma":      parse_field(raw, "TRENER_DOMA"),
-        "trener_gostje":    parse_field(raw, "TRENER_GOSTJE"),
-        "ver_doma":         parse_field(raw, "VERJETNOST_DOMA"),
-        "ver_remi":         parse_field(raw, "VERJETNOST_REMI"),
-        "ver_gostje":       parse_field(raw, "VERJETNOST_GOSTJE"),
-        "kvota_doma":       parse_field(raw, "KVOTA_DOMA"),
-        "kvota_remi":       parse_field(raw, "KVOTA_REMI"),
-        "kvota_gostje":     parse_field(raw, "KVOTA_GOSTJE"),
-        "value_bet":        parse_field(raw, "VALUE_BET"),
-        "value_trg":        parse_field(raw, "VALUE_TRG"),
-        "razlog_value":     parse_field(raw, "RAZLOG_VALUE"),
-        "priporocilo":      parse_field(raw, "PRIPOROCILO"),
-        "zaupanje":         parse_field(raw, "ZAUPANJE"),
-        "opozorilo":        parse_field(raw, "OPOZORILO"),
+        "raw": raw_json,
+        "analiza": raw_json[:300] if len(raw_json) > 10 else "Napaka pri analizi",
+        "postava_doma": "—", "postava_gostje": "—",
+        "forma_doma": "—", "forma_gostje": "—",
+        "trener_doma": "—", "trener_gostje": "—",
+        "ver_doma": "—", "ver_remi": "—", "ver_gostje": "—",
+        "kvota_doma": "—", "kvota_remi": "—", "kvota_gostje": "—",
+        "value_bet": "NE", "value_trg": "—", "razlog_value": "—",
+        "priporocilo": "—", "zaupanje": "—", "opozorilo": "—",
     }
 
 
